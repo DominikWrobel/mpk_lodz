@@ -1,0 +1,12 @@
+{
+  "domain": "mpk_lodz",
+  "name": "MPK Łódź",
+  "documentation": "https://github.com/DominikWrobel/mpk_lodz",
+  "issue_tracker": "https://github.com/DominikWrobel/mpk_lodz/issues",
+  "dependencies": [],
+  "codeowners": ["@PiotrMachowski, @DominikWrobel"],
+  "requirements": ["requests"],
+  "version": "v0.2",
+  "config_flow": true,
+  "iot_class": "cloud_polling"
+}
