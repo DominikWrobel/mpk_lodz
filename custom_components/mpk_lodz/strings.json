@@ -1,0 +1,38 @@
+{
+    "title": "MPK Łódź",
+    "config": {
+        "step": {
+            "user": {
+                "title": "MPK Łódź",
+                "description": "Set up MPK Łódź integration. You must provide exactly one of: stop ID, stop number, or stop group.",
+                "data": {
+                    "name": "Name",
+                    "id": "Stop ID",
+                    "num": "Stop Number",
+                    "group": "Stop Group"
+                }
+            }
+        },
+        "error": {
+            "cannot_connect": "Failed to connect",
+            "invalid_auth": "Invalid authentication",
+            "unknown": "Unexpected error"
+        },
+        "abort": {
+            "already_configured": "Device is already configured"
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "MPK Łódź Options",
+                "description": "Update your stop configuration. You must provide exactly one of: stop ID, stop number, or stop group.",
+                "data": {
+                    "id": "Stop ID",
+                    "num": "Stop Number",
+                    "group": "Stop Group"
+                }
+            }
+        }
+    }
+}
