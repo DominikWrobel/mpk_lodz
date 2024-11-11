@@ -2,6 +2,8 @@
 
 ![icon2](https://github.com/user-attachments/assets/f781b344-b2f0-4107-873e-b159c66fdcb9)
 
+Polish version: https://github.com/DominikWrobel/mpk_lodz/blob/main/PL.md
+
 This is an integration to get live bus and tram departures using an unofficial [MPK Łódź](https://www.mpk.lodz.pl/) API. The code is based on the work of [@PiotrMachowski](https://github.com/PiotrMachowski/Home-Assistant-custom-components-MPK-Lodz)
 
 #### Install
