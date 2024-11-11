@@ -6,14 +6,14 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
 
-DEFAULT_NAME = 'MPK Łódź'
-CONF_ID = 'id'
-CONF_NAME = 'name'
-CONF_NUM = 'num'
-CONF_GROUP = 'group'
-CONF_STOPS = 'stops'
-CONF_LINES = 'lines'
-CONF_DIRECTIONS = 'directions'
+from .const import (
+    DEFAULT_NAME,
+    CONF_ID,
+    CONF_NAME,
+    CONF_NUM,
+    CONF_GROUP,
+    CONF_STOPS,
+)
 
 ENTITY_ID_FORMAT = "sensor.mpk_lodz_{}"
 SCAN_INTERVAL = timedelta(minutes=1)
@@ -108,15 +108,22 @@ class MpkLodzDepartureSensor(SensorEntity):
         elif self._departure.get("air_conditioned"):
             features = '<span style="color: lightblue;" data-darkreader-inline-color=""><ha-icon icon="mdi:snowflake"></ha-icon>'
 
-        return {
+        attributes = {
             "line": self._departure["line"],
             "direction": self._departure["direction"],
             "time": self._departure["departure_time"],
-            "current_time": self._departure["current_time"],
-            "alert": self._departure["alert"],
             "features": features,
             "stop_name": self._stop_name,
         }
+
+        # Only add current_time and alert to the first entity
+        if self._index == 0:
+            attributes.update({
+                "current_time": self._departure["current_time"],
+                "alert": self._departure["alert"],
+            })
+
+        return attributes
 
     async def async_update(self):
         """Fetch new state data for the sensor."""
@@ -136,7 +143,7 @@ def get_stop_name(stop, use_stop_num, use_group):
         return None
     return data[0].attrib["name"]
 
-def get_departures(stop, use_stop_num, use_group, watched_lines=None, watched_directions=None):
+def get_departures(stop, use_stop_num, use_group):
     data = get_data(stop, use_stop_num, use_group)
     if data is None:
         return []
@@ -152,23 +159,13 @@ def get_departures(stop, use_stop_num, use_group, watched_lines=None, watched_di
     for departure in departures:
         line = departure.attrib["nr"]
         direction = departure.attrib["dir"]
-        if (watched_lines and line not in watched_lines) or (watched_directions and direction not in watched_directions):
-            continue
 
         features = departure.attrib.get("vuw", "")
         low_floor = "N" in features
         air_conditioned = "K" in features
 
-        departure_time = departure[0].attrib.get('t', '')
-
-        if departure_time == '<1min':
-            departure_time = "<1min"
-        elif departure_time == '1 min':
-            departure_time = "1 min"
-        elif departure_time == '2 min':
-            departure_time = "2 min"
-        else:
-            departure_time = departure_time if departure_time else "Unknown"
+        # Simply get the departure time value or "Unknown" if not present
+        departure_time = departure[0].attrib.get('t', 'Unknown')
 
         parsed_departures.append({
             "line": line,
