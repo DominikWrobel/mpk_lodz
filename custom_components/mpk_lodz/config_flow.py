@@ -13,8 +13,6 @@ from .const import (
     CONF_NUM,
     CONF_GROUP,
     CONF_STOPS,
-    CONF_LINES,
-    CONF_DIRECTIONS,
 )
 
 class MPKLodzOptionsFlow(config_entries.OptionsFlow):
@@ -29,18 +27,12 @@ class MPKLodzOptionsFlow(config_entries.OptionsFlow):
     ) -> FlowResult:
         """Manage the options."""
         if user_input is not None:
-            # Convert comma-separated strings to lists
-            lines = [line.strip() for line in user_input.get(CONF_LINES, "").split(",") if line.strip()]
-            directions = [dir.strip() for dir in user_input.get(CONF_DIRECTIONS, "").split(",") if dir.strip()]
-
             return self.async_create_entry(
                 title="",
                 data={
                     CONF_ID: user_input[CONF_ID],
                     CONF_NUM: user_input[CONF_NUM],
                     CONF_GROUP: user_input[CONF_GROUP],
-                    CONF_LINES: lines,
-                    CONF_DIRECTIONS: directions,
                 },
             )
 
@@ -53,8 +45,6 @@ class MPKLodzOptionsFlow(config_entries.OptionsFlow):
                     vol.Required(CONF_ID, default=stop.get(CONF_ID, 0)): vol.Coerce(int),
                     vol.Optional(CONF_NUM, default=stop.get(CONF_NUM, 0)): vol.Coerce(int),
                     vol.Optional(CONF_GROUP, default=stop.get(CONF_GROUP, 0)): vol.Coerce(int),
-                    vol.Optional(CONF_LINES, default=",".join(stop.get(CONF_LINES, []))): str,
-                    vol.Optional(CONF_DIRECTIONS, default=",".join(stop.get(CONF_DIRECTIONS, []))): str,
                 }
             )
         )
@@ -71,10 +61,6 @@ class MPKLodzConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         errors = {}
 
         if user_input is not None:
-            # Convert comma-separated strings to lists
-            lines = [line.strip() for line in user_input.get(CONF_LINES, "").split(",") if line.strip()]
-            directions = [dir.strip() for dir in user_input.get(CONF_DIRECTIONS, "").split(",") if dir.strip()]
-
             return self.async_create_entry(
                 title=user_input[CONF_NAME],
                 data={
@@ -83,8 +69,6 @@ class MPKLodzConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         CONF_ID: user_input.get(CONF_ID, 0),
                         CONF_NUM: user_input.get(CONF_NUM, 0),
                         CONF_GROUP: user_input.get(CONF_GROUP, 0),
-                        CONF_LINES: lines,
-                        CONF_DIRECTIONS: directions
                     }]
                 }
             )
@@ -97,8 +81,6 @@ class MPKLodzConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_ID, default=0): vol.Coerce(int),
                     vol.Optional(CONF_NUM, default=0): vol.Coerce(int),
                     vol.Optional(CONF_GROUP, default=0): vol.Coerce(int),
-                    vol.Optional(CONF_LINES, default=""): str,
-                    vol.Optional(CONF_DIRECTIONS, default=""): str,
                 }
             ),
             errors=errors,
