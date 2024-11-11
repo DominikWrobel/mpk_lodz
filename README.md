@@ -31,7 +31,9 @@ This data format is optimised for use by the [custom:flex-table-card](https://gi
 
 ![pc](https://github.com/user-attachments/assets/9838b462-210e-4dfd-8657-5dbca5fba444)
 
-Card yaml:
+<details>
+<summary>Card yaml:</summary>
+  
 ```
 type: custom:flex-table-card
 entities:
@@ -169,17 +171,22 @@ card_mod:
       content: "{{ (state_attr("sensor.mpk_lodz_group_1_piotrkowska_centrum_0", "current_time")) }}";
     }
 ```
+</details>
 
 And for the allert you can use the markdown card:
 
 ![alert](https://github.com/user-attachments/assets/e8a93940-9ed7-4d06-8b62-be343501d1a7)
 
+<details>
+<summary>Card yaml:</summary>
+  
 ```
 type: markdown
 content: >
   <center> {{ (state_attr("sensor.mpk_lodz_group_1_piotrkowska_centrum_0",
   "alert")) }} </center>
 ```
+</details>
 
 You can set up as many stops as you want the data will be fatched every 1 min. Be aware that bus and tram stops without a LED display will not show the allert status, you can set up another stop (like Piotrkowska Centrum) to get the allert info.
 
