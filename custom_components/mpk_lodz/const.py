@@ -9,8 +9,6 @@ CONF_NAME = "name"
 CONF_NUM = "num"
 CONF_GROUP = 'group'
 CONF_STOPS = "stops"
-CONF_LINES = "lines"
-CONF_DIRECTIONS = "directions"
 CONF_STOP_TYPE = "stop_type"
 
 STOP_TYPE_ID = "id"
