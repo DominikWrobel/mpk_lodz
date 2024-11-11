@@ -1,0 +1,38 @@
+{
+    "title": "MPK Łódź",
+    "config": {
+        "step": {
+            "user": {
+                "title": "MPK Łódź",
+                "description": "Integracja MPK Łódź. Proszę wybrać jedną z opcji identyfikacji przystanku: ID, numer lub grupa.",
+                "data": {
+                    "name": "Nazwa",
+                    "id": "ID",
+                    "num": "Numer",
+                    "group": "Grupa"
+                }
+            }
+        },
+        "error": {
+            "cannot_connect": "Nie udało się połączyć",
+            "invalid_auth": "Invalid authentication",
+            "unknown": "Nieznany błąd"
+        },
+        "abort": {
+            "already_configured": "Przystanek jest już skonfigurowany"
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "title": "MPK Łódź opcje",
+                "description": "Zaktualizuj swoją konfigurację. Proszę podać identyfikację przystanku: ID, numer lub grupa.",
+                "data": {
+                    "id": "ID",
+                    "num": "Numer",
+                    "group": "Grupa"
+                }
+            }
+        }
+    }
+}
