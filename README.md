@@ -32,7 +32,7 @@ This data format is optimised for use by the [custom:flex-table-card](https://gi
 ![pc](https://github.com/user-attachments/assets/9838b462-210e-4dfd-8657-5dbca5fba444)
 
 <details>
-<summary>Card yaml:</summary>
+<summary>Card yaml</summary>
   
 ```
 type: custom:flex-table-card
@@ -178,7 +178,7 @@ And for the allert you can use the markdown card:
 ![alert](https://github.com/user-attachments/assets/e8a93940-9ed7-4d06-8b62-be343501d1a7)
 
 <details>
-<summary>Card yaml:</summary>
+<summary>Card yaml</summary>
   
 ```
 type: markdown
