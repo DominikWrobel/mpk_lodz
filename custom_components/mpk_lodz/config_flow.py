@@ -42,7 +42,7 @@ class MPKLodzOptionsFlow(config_entries.OptionsFlow):
             step_id="init",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_ID, default=stop.get(CONF_ID, 0)): vol.Coerce(int),
+                    vol.Optional(CONF_ID, default=stop.get(CONF_ID, 0)): vol.Coerce(int),
                     vol.Optional(CONF_NUM, default=stop.get(CONF_NUM, 0)): vol.Coerce(int),
                     vol.Optional(CONF_GROUP, default=stop.get(CONF_GROUP, 0)): vol.Coerce(int),
                 }
@@ -78,7 +78,7 @@ class MPKLodzConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_NAME, default=DEFAULT_NAME): str,
-                    vol.Required(CONF_ID, default=0): vol.Coerce(int),
+                    vol.Optional(CONF_ID, default=0): vol.Coerce(int),
                     vol.Optional(CONF_NUM, default=0): vol.Coerce(int),
                     vol.Optional(CONF_GROUP, default=0): vol.Coerce(int),
                 }
