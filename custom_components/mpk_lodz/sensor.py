@@ -5,6 +5,7 @@ from homeassistant.components.sensor import SensorEntity
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
+import logging
 
 from .const import (
     DEFAULT_NAME,
@@ -17,6 +18,11 @@ from .const import (
 
 ENTITY_ID_FORMAT = "sensor.mpk_lodz_{}"
 SCAN_INTERVAL = timedelta(minutes=1)
+REQUEST_TIMEOUT = 10  # Timeout in seconds
+MAX_RETRIES = 3
+RETRY_DELAY = 1  # Delay between retries in seconds
+
+_LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
     """Set up MPK Łódź sensor from a config entry."""
@@ -30,43 +36,47 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         stop_num = str(stop_cfg.get(CONF_NUM, "0"))
         stop_group = str(stop_cfg.get(CONF_GROUP, "0"))
         
-        # Check that only one option is used
         options_used = sum(1 for x in [stop_id, stop_num, stop_group] if x != "0")
         if options_used != 1:
-            raise Exception(
+            _LOGGER.error(
                 f"Please configure exactly one option: stop ID ({stop_id}), stop number ({stop_num}), "
                 f"or stop group ({stop_group}). Currently {options_used} options are set."
             )
+            continue
 
         use_stop_num = stop_num != "0"
         use_group = stop_group != "0"
         stop = stop_num if use_stop_num else stop_group if use_group else stop_id
 
-        real_stop_name = await hass.async_add_executor_job(
-            get_stop_name, stop, use_stop_num, use_group
-        )
-
-        if real_stop_name is None:
-            raise Exception(f"Could not find stop with the given parameters. Please check if the configured stop exists.")
-
-        departures = await hass.async_add_executor_job(
-            get_departures, stop, use_stop_num, use_group
-        )
-
-        # Create a unique prefix based on the type of stop identifier used
-        stop_type = "num" if use_stop_num else "group" if use_group else "id"
-        
-        for i in range(min(10, len(departures))):
-            sanitized_stop_name = real_stop_name.lower().replace(' ', '_')
-            entity_id = async_generate_entity_id(
-                ENTITY_ID_FORMAT, 
-                f"{stop_type}_{stop}_{sanitized_stop_name}_{i}", 
-                hass=hass
+        try:
+            real_stop_name = await hass.async_add_executor_job(
+                get_stop_name, stop, use_stop_num, use_group
             )
-            sensor = MpkLodzDepartureSensor(
-                entity_id, real_stop_name, stop, i, departures[i], use_stop_num, use_group
+
+            if real_stop_name is None:
+                _LOGGER.error(f"Could not find stop with the given parameters. Please check if the configured stop exists.")
+                continue
+
+            departures = await hass.async_add_executor_job(
+                get_departures, stop, use_stop_num, use_group
             )
-            entities.append(sensor)
+
+            stop_type = "num" if use_stop_num else "group" if use_group else "id"
+            
+            for i in range(min(10, len(departures))):
+                sanitized_stop_name = real_stop_name.lower().replace(' ', '_')
+                entity_id = async_generate_entity_id(
+                    ENTITY_ID_FORMAT, 
+                    f"{stop_type}_{stop}_{sanitized_stop_name}_{i}", 
+                    hass=hass
+                )
+                sensor = MpkLodzDepartureSensor(
+                    entity_id, real_stop_name, stop, i, departures[i], use_stop_num, use_group
+                )
+                entities.append(sensor)
+        except Exception as e:
+            _LOGGER.error(f"Error setting up stop {stop}: {str(e)}")
+            continue
 
     async_add_entities(entities, True)
 
@@ -80,8 +90,8 @@ class MpkLodzDepartureSensor(SensorEntity):
         self._use_stop_num = use_stop_num
         self._use_group = use_group
         self._name = f"{stop_name} {index}"
+        self._available = True
         
-        # Create a more unique identifier by combining stop type, stop value, and index
         stop_type = "num" if use_stop_num else "group" if use_group else "id"
         self._attr_unique_id = f"mpk_lodz_{stop_type}_{stop}_{index}"
         self._attr_should_poll = True
@@ -95,18 +105,25 @@ class MpkLodzDepartureSensor(SensorEntity):
         return "mdi:bus-clock"
 
     @property
+    def available(self):
+        return self._available
+
+    @property
     def state(self):
-        return self._departure["departure_time"]
+        return self._departure["departure_time"] if self._available else None
 
     @property
     def extra_state_attributes(self):
+        if not self._available:
+            return {}
+
         features = ""
         if self._departure.get("low_floor") and self._departure.get("air_conditioned"):
-            features = '<span style="color: orange;" data-darkreader-inline-color=""><ha-icon icon="mdi:wheelchair"></ha-icon><span style="color: lightblue;" data-darkreader-inline-color=""><ha-icon icon="mdi:snowflake"></ha-icon>'
+            features = '<span style="color: orange;"><ha-icon icon="mdi:wheelchair"></ha-icon><span style="color: lightblue;"><ha-icon icon="mdi:snowflake"></ha-icon>'
         elif self._departure.get("low_floor"):
-            features = '<span style="color: orange;" data-darkreader-inline-color=""><ha-icon icon="mdi:wheelchair"></ha-icon>'
+            features = '<span style="color: orange;"><ha-icon icon="mdi:wheelchair"></ha-icon>'
         elif self._departure.get("air_conditioned"):
-            features = '<span style="color: lightblue;" data-darkreader-inline-color=""><ha-icon icon="mdi:snowflake"></ha-icon>'
+            features = '<span style="color: lightblue;"><ha-icon icon="mdi:snowflake"></ha-icon>'
 
         attributes = {
             "line": self._departure["line"],
@@ -116,7 +133,6 @@ class MpkLodzDepartureSensor(SensorEntity):
             "stop_name": self._stop_name,
         }
 
-        # Only add current_time and alert to the first entity
         if self._index == 0:
             attributes.update({
                 "current_time": self._departure["current_time"],
@@ -127,15 +143,22 @@ class MpkLodzDepartureSensor(SensorEntity):
 
     async def async_update(self):
         """Fetch new state data for the sensor."""
-        departures = await self.hass.async_add_executor_job(
-            get_departures,
-            self._stop,
-            self._use_stop_num,
-            self._use_group
-        )
-        
-        if len(departures) > self._index:
-            self._departure = departures[self._index]
+        try:
+            departures = await self.hass.async_add_executor_job(
+                get_departures,
+                self._stop,
+                self._use_stop_num,
+                self._use_group
+            )
+            
+            if len(departures) > self._index:
+                self._departure = departures[self._index]
+                self._available = True
+            else:
+                self._available = False
+        except Exception as e:
+            _LOGGER.error(f"Error updating sensor {self.entity_id}: {str(e)}")
+            self._available = False
 
 def get_stop_name(stop, use_stop_num, use_group):
     data = get_data(stop, use_stop_num, use_group)
@@ -151,9 +174,7 @@ def get_departures(stop, use_stop_num, use_group):
     departures = data[0][0]
     parsed_departures = []
 
-    # Get current time from payload.Schedules.$.time
     current_time = data.attrib.get('time', '')
-    # Get alert from payload.Schedules.Stop[0].$.ds
     alert = data[0].attrib.get('ds', ' ')
 
     for departure in departures:
@@ -164,7 +185,6 @@ def get_departures(stop, use_stop_num, use_group):
         low_floor = "N" in features
         air_conditioned = "K" in features
 
-        # Simply get the departure time value or "Unknown" if not present
         departure_time = departure[0].attrib.get('t', 'Unknown')
 
         parsed_departures.append({
@@ -190,7 +210,27 @@ def get_data(stop, use_stop_num, use_group):
     headers = {
         'referer': address,
     }
-    response = requests.get(address, headers=headers)
-    if response.status_code == 200 and response.content:
-        return ET.fromstring(response.text)
+
+    session = requests.Session()
+    for attempt in range(MAX_RETRIES):
+        try:
+            response = session.get(
+                address, 
+                headers=headers, 
+                timeout=REQUEST_TIMEOUT
+            )
+            if response.status_code == 200 and response.content:
+                return ET.fromstring(response.text)
+            _LOGGER.warning(f"Failed to get data, status code: {response.status_code}")
+            return None
+        except requests.Timeout:
+            if attempt < MAX_RETRIES - 1:
+                _LOGGER.warning(f"Request timed out, attempt {attempt + 1} of {MAX_RETRIES}")
+                time.sleep(RETRY_DELAY)
+            else:
+                _LOGGER.error("Max retries exceeded, request timed out")
+                return None
+        except Exception as e:
+            _LOGGER.error(f"Error fetching data: {str(e)}")
+            return None
     return None
