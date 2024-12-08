@@ -4,7 +4,7 @@
   "documentation": "https://github.com/DominikWrobel/mpk_lodz",
   "issue_tracker": "https://github.com/DominikWrobel/mpk_lodz/issues",
   "dependencies": [],
-  "codeowners": ["@PiotrMachowski, @DominikWrobel"],
+  "codeowners": ["@PiotrMachowski", "@DominikWrobel"],
   "requirements": ["requests"],
   "version": "v0.5",
   "config_flow": true,
