@@ -6,6 +6,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity import async_generate_entity_id
 import logging
+import time
 
 from .const import (
     DEFAULT_NAME,
@@ -24,6 +25,10 @@ RETRY_DELAY = 1  # Delay between retries in seconds
 
 _LOGGER = logging.getLogger(__name__)
 
+# Track last error to prevent repeated logging
+_LAST_ERROR_TIME = {}
+_ERROR_LOG_INTERVAL = 300  # 5 minutes between repeated error logs
+
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities):
     """Set up MPK Łódź sensor from a config entry."""
     config = entry.data
@@ -38,7 +43,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
         
         options_used = sum(1 for x in [stop_id, stop_num, stop_group] if x != "0")
         if options_used != 1:
-            _LOGGER.error(
+            _log_error(
                 f"Please configure exactly one option: stop ID ({stop_id}), stop number ({stop_num}), "
                 f"or stop group ({stop_group}). Currently {options_used} options are set."
             )
@@ -54,7 +59,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
             )
 
             if real_stop_name is None:
-                _LOGGER.error(f"Could not find stop with the given parameters. Please check if the configured stop exists.")
+                _log_error(f"Could not find stop with the given parameters. Please check if the configured stop exists.")
                 continue
 
             departures = await hass.async_add_executor_job(
@@ -75,7 +80,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_e
                 )
                 entities.append(sensor)
         except Exception as e:
-            _LOGGER.error(f"Error setting up stop {stop}: {str(e)}")
+            _log_error(f"Error setting up stop {stop}: {str(e)}")
             continue
 
     async_add_entities(entities, True)
@@ -110,7 +115,7 @@ class MpkLodzDepartureSensor(SensorEntity):
 
     @property
     def state(self):
-        return self._departure["departure_time"] if self._available else None
+        return self._departure.get("departure_time") if self._available else None
 
     @property
     def extra_state_attributes(self):
@@ -126,17 +131,17 @@ class MpkLodzDepartureSensor(SensorEntity):
             features = '<span style="color: lightblue;"><ha-icon icon="mdi:snowflake"></ha-icon>'
 
         attributes = {
-            "line": self._departure["line"],
-            "direction": self._departure["direction"],
-            "time": self._departure["departure_time"],
+            "line": self._departure.get("line", "N/A"),
+            "direction": self._departure.get("direction", "N/A"),
+            "time": self._departure.get("departure_time", "N/A"),
             "features": features,
             "stop_name": self._stop_name,
         }
 
         if self._index == 0:
             attributes.update({
-                "current_time": self._departure["current_time"],
-                "alert": self._departure["alert"],
+                "current_time": self._departure.get("current_time", "N/A"),
+                "alert": self._departure.get("alert", " "),
             })
 
         return attributes
@@ -156,9 +161,23 @@ class MpkLodzDepartureSensor(SensorEntity):
                 self._available = True
             else:
                 self._available = False
+                _log_error(f"No departure data available for {self.entity_id}")
         except Exception as e:
-            _LOGGER.error(f"Error updating sensor {self.entity_id}: {str(e)}")
+            _log_error(f"Error updating sensor {self.entity_id}: {str(e)}")
             self._available = False
+
+def _log_error(message):
+    """
+    Log an error, but prevent repeated logging of the same error 
+    within a short time frame.
+    """
+    current_time = time.time()
+    
+    # Use full error message as key to track unique errors
+    if message not in _LAST_ERROR_TIME or \
+       current_time - _LAST_ERROR_TIME.get(message, 0) > _ERROR_LOG_INTERVAL:
+        _LOGGER.error(message)
+        _LAST_ERROR_TIME[message] = current_time
 
 def get_stop_name(stop, use_stop_num, use_group):
     data = get_data(stop, use_stop_num, use_group)
@@ -171,31 +190,40 @@ def get_departures(stop, use_stop_num, use_group):
     if data is None:
         return []
 
-    departures = data[0][0]
-    parsed_departures = []
-
+    # Safely get current time and alert, defaulting to empty strings
     current_time = data.attrib.get('time', '')
     alert = data[0].attrib.get('ds', ' ')
 
+    try:
+        departures = data[0][0]
+    except (IndexError, AttributeError):
+        _log_error(f"Unable to parse departures for stop {stop}")
+        return []
+
+    parsed_departures = []
+
     for departure in departures:
-        line = departure.attrib["nr"]
-        direction = departure.attrib["dir"]
+        try:
+            line = departure.attrib.get("nr", "N/A")
+            direction = departure.attrib.get("dir", "N/A")
 
-        features = departure.attrib.get("vuw", "")
-        low_floor = "N" in features
-        air_conditioned = "K" in features
+            features = departure.attrib.get("vuw", "")
+            low_floor = "N" in features
+            air_conditioned = "K" in features
 
-        departure_time = departure[0].attrib.get('t', 'Unknown')
+            departure_time = departure[0].attrib.get('t', 'Unknown')
 
-        parsed_departures.append({
-            "line": line,
-            "direction": direction,
-            "departure_time": departure_time,
-            "current_time": current_time,
-            "alert": alert,
-            "low_floor": low_floor,
-            "air_conditioned": air_conditioned
-        })
+            parsed_departures.append({
+                "line": line,
+                "direction": direction,
+                "departure_time": departure_time,
+                "current_time": current_time,
+                "alert": alert,
+                "low_floor": low_floor,
+                "air_conditioned": air_conditioned
+            })
+        except Exception as e:
+            _log_error(f"Error parsing individual departure: {str(e)}")
 
     return parsed_departures
 
@@ -221,16 +249,16 @@ def get_data(stop, use_stop_num, use_group):
             )
             if response.status_code == 200 and response.content:
                 return ET.fromstring(response.text)
-            _LOGGER.warning(f"Failed to get data, status code: {response.status_code}")
+            _log_error(f"Failed to get data, status code: {response.status_code}")
             return None
         except requests.Timeout:
             if attempt < MAX_RETRIES - 1:
-                _LOGGER.warning(f"Request timed out, attempt {attempt + 1} of {MAX_RETRIES}")
+                _log_error(f"Request timed out, attempt {attempt + 1} of {MAX_RETRIES}")
                 time.sleep(RETRY_DELAY)
             else:
-                _LOGGER.error("Max retries exceeded, request timed out")
+                _log_error("Max retries exceeded, request timed out")
                 return None
         except Exception as e:
-            _LOGGER.error(f"Error fetching data: {str(e)}")
+            _log_error(f"Error fetching data: {str(e)}")
             return None
     return None
