@@ -195,15 +195,31 @@ def get_departures(stop, use_stop_num, use_group):
     alert = data[0].attrib.get('ds', ' ')
 
     try:
-        departures = data[0][0]
-    except (IndexError, AttributeError):
-        _log_error(f"Unable to parse departures for stop {stop}")
+        # Find the Day element which contains the departures
+        # Sometimes there's an <A> element first, sometimes not
+        day_element = None
+        for child in data[0]:
+            if child.tag == 'Day':
+                day_element = child
+                break
+        
+        if day_element is None:
+            _log_error(f"No Day element found for stop {stop}")
+            return []
+            
+        departures = day_element  # The Day element contains the R (departure) elements
+    except (IndexError, AttributeError) as e:
+        _log_error(f"Unable to parse departures for stop {stop}: {str(e)}")
         return []
 
     parsed_departures = []
 
     for departure in departures:
         try:
+            # Skip if not an R element (departure)
+            if departure.tag != 'R':
+                continue
+                
             line = departure.attrib.get("nr", "N/A")
             direction = departure.attrib.get("dir", "N/A")
 
@@ -211,7 +227,12 @@ def get_departures(stop, use_stop_num, use_group):
             low_floor = "N" in features
             air_conditioned = "K" in features
 
-            departure_time = departure[0].attrib.get('t', 'Unknown')
+            # Get the first S element (schedule) from this departure
+            schedule_element = departure.find('S')
+            if schedule_element is not None:
+                departure_time = schedule_element.attrib.get('t', 'Unknown')
+            else:
+                departure_time = 'Unknown'
 
             parsed_departures.append({
                 "line": line,
