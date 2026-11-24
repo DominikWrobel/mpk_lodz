@@ -1,3 +1,5 @@
+Ta integracja nie będzie już wspierana, osobiście używam teraz: https://github.com/toczke/polish-public-transport-card
+
 # MPK Łódź
 
 ![icon2](https://github.com/user-attachments/assets/f781b344-b2f0-4107-873e-b159c66fdcb9)
